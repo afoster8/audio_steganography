@@ -1,17 +1,7 @@
 import wave
 import numpy as np
-from scipy.signal import butter, filtfilt
 import os
 import argparse
-
-
-def apply_lowpass_filter(data, cutoff, sr, order=5):
-    nyquist = 0.5 * sr
-    normal_cutoff = cutoff / nyquist
-    b, a = butter(order, normal_cutoff, btype='low', analog=False)
-    filtered_data = filtfilt(b, a, data)
-    
-    return filtered_data
 
 
 def insert_data(audio_file, message, output_file):
@@ -20,15 +10,11 @@ def insert_data(audio_file, message, output_file):
             frame_bytes = bytearray(file.readframes(file.getnframes()))
             sr = file.getframerate()
         
-        cutoff = 10000  
-        filtered_signal = apply_lowpass_filter(np.frombuffer(frame_bytes, dtype=np.int16), cutoff, sr)
-        frame_bytes_filtered = filtered_signal.astype(np.int16).tobytes()
-        
         message += "#####"
         message_bits = ''.join(format(ord(char), '08b') for char in message)
         message_length = len(message_bits)
         
-        if message_length * 2 > len(frame_bytes_filtered):
+        if message_length * 2 > len(frame_bytes):
             raise ValueError("Message is too large to be embedded in the audio file.")
         
         for i in range(message_length):
@@ -66,10 +52,6 @@ def extract_data(audio_file):
         return None
 
 
-def embed(audio_file, message, output_file):
-    insert_data(audio_file, message, output_file)
-
-
 def main():
     parser = argparse.ArgumentParser(description="Embed or extract a message from an audio file.")
     parser.add_argument("action", choices=["embed", "extract"], help="Action to perform: embed or extract")
@@ -81,7 +63,7 @@ def main():
         if not args.message:
             parser.error("Message is required for 'embed' action")
         output_file = os.path.splitext(args.audio_file)[0] + "_embedded.wav"
-        embed(args.audio_file, args.message, output_file)
+        insert_data(args.audio_file, args.message, output_file)
         print("Message embedded successfully.")
     elif args.action == "extract":
         extracted_message = extract_data(args.audio_file)
